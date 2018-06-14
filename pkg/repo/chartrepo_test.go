@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
+
 	"k8s.io/helm/pkg/getter"
 	"k8s.io/helm/pkg/helm/environment"
 	"k8s.io/helm/pkg/proto/hapi/chart"
@@ -38,8 +40,14 @@ const (
 )
 
 func TestLoadChartRepository(t *testing.T) {
+	root, err := filepath.Abs(testRepository)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
 	r, err := NewChartRepository(&Entry{
 		Name: testRepository,
+		Root: root,
 		URL:  testURL,
 	}, getter.All(environment.EnvSettings{}))
 	if err != nil {
@@ -49,6 +57,9 @@ func TestLoadChartRepository(t *testing.T) {
 	if err := r.Load(); err != nil {
 		t.Errorf("Problem loading chart repository from %s: %v", testRepository, err)
 	}
+
+	fmt.Fprintf(os.Stderr, "DEBUG: %#v\n", "fuck!")
+	os.Exit(1)
 
 	paths := []string{
 		filepath.Join(testRepository, "frobnitz-1.2.3.tgz"),
@@ -71,8 +82,14 @@ func TestLoadChartRepository(t *testing.T) {
 }
 
 func TestIndex(t *testing.T) {
+	root, err := filepath.Abs(testRepository)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
 	r, err := NewChartRepository(&Entry{
-		Name: testRepository,
+		Name: "A test repository",
+		Root: root,
 		URL:  testURL,
 	}, getter.All(environment.EnvSettings{}))
 	if err != nil {
@@ -130,6 +147,7 @@ func verifyIndex(t *testing.T, actual *IndexFile) {
 					Name:    "frobnitz",
 					Version: "1.2.3",
 				},
+				URLs: []string{"http://example-charts.com/frobnitz-1.2.3.tgz"},
 			},
 		},
 		"sprocket": {
@@ -138,12 +156,14 @@ func verifyIndex(t *testing.T, actual *IndexFile) {
 					Name:    "sprocket",
 					Version: "1.2.0",
 				},
+				URLs: []string{"http://example-charts.com/sprocket-1.2.0.tgz"},
 			},
 			{
 				Metadata: &chart.Metadata{
 					Name:    "sprocket",
 					Version: "1.1.0",
 				},
+				URLs: []string{"http://example-charts.com/sprocket-1.1.0.tgz"},
 			},
 		},
 		"zarthal": {
@@ -152,6 +172,7 @@ func verifyIndex(t *testing.T, actual *IndexFile) {
 					Name:    "zarthal",
 					Version: "1.0.0",
 				},
+				URLs: []string{"http://example-charts.com/universe/zarthal-1.0.0.tgz"},
 			},
 		},
 	}
@@ -194,6 +215,10 @@ func verifyIndex(t *testing.T, actual *IndexFile) {
 			}
 			if len(g.URLs) != 1 {
 				t.Error("Expected exactly 1 URL")
+			}
+
+			if e.URLs[0] != g.URLs[0] {
+				t.Errorf("Expected URL to be %q but got %q", e.URLs[0], g.URLs[0])
 			}
 		}
 	}

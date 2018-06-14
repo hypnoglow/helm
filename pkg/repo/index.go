@@ -113,12 +113,21 @@ func (i IndexFile) Add(md *chart.Metadata, filename, baseURL, digest string) {
 			u = filepath.Join(baseURL, file)
 		}
 	}
+
+	fmt.Fprintf(os.Stderr, "url: %#v\n", u)
+	fmt.Println()
+
+	i.AddChartVersion(md, u, digest)
+}
+
+func (i IndexFile) AddChartVersion(md *chart.Metadata, url, digest string) {
 	cr := &ChartVersion{
-		URLs:     []string{u},
+		URLs:     []string{url},
 		Metadata: md,
 		Digest:   digest,
 		Created:  time.Now(),
 	}
+
 	if ee, ok := i.Entries[md.Name]; !ok {
 		i.Entries[md.Name] = ChartVersions{cr}
 	} else {
@@ -221,11 +230,11 @@ type ChartVersion struct {
 	Digest  string    `json:"digest,omitempty"`
 }
 
-// IndexDirectory reads a (flat) directory and generates an index.
+// IndexDirectory recursively reads a directory and generates an index.
 //
 // It indexes only charts that have been packaged (*.tgz).
 //
-// The index returned will be in an unsorted state
+// The index returned will be in an unsorted state.
 func IndexDirectory(dir, baseURL string) (*IndexFile, error) {
 	archives, err := filepath.Glob(filepath.Join(dir, "*.tgz"))
 	if err != nil {
@@ -244,11 +253,9 @@ func IndexDirectory(dir, baseURL string) (*IndexFile, error) {
 			return index, err
 		}
 
-		var parentDir string
-		parentDir, fname = filepath.Split(fname)
-		parentURL, err := urlutil.URLJoin(baseURL, parentDir)
+		url, err := urlutil.URLJoin(baseURL, fname)
 		if err != nil {
-			parentURL = filepath.Join(baseURL, parentDir)
+			url = filepath.Join(baseURL, fname)
 		}
 
 		c, err := chartutil.Load(arch)
@@ -260,7 +267,8 @@ func IndexDirectory(dir, baseURL string) (*IndexFile, error) {
 		if err != nil {
 			return index, err
 		}
-		index.Add(c.Metadata, fname, parentURL, hash)
+
+		index.AddChartVersion(c.Metadata, url, hash)
 	}
 	return index, nil
 }
@@ -323,7 +331,7 @@ func loadUnversionedIndex(data []byte) (*IndexFile, error) {
 			}
 			item.Chartfile = &chart.Metadata{Name: parts[0], Version: ver}
 		}
-		ni.Add(item.Chartfile, item.URL, "", item.Checksum)
+		ni.AddChartVersion(item.Chartfile, item.URL, item.Checksum)
 	}
 	return ni, nil
 }

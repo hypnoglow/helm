@@ -124,6 +124,7 @@ func Reindex(ch *chart.Chart, path string) error {
 			return err
 		}
 
+		// TODO: rework this
 		y.Add(ch.Metadata, name+".tgz", "http://127.0.0.1:8879/charts", "sha256:"+dig)
 
 		out, err := yaml.Marshal(y)

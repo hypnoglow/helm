@@ -29,11 +29,18 @@ import (
 	"k8s.io/helm/pkg/chartutil"
 	"k8s.io/helm/pkg/getter"
 	"k8s.io/helm/pkg/provenance"
+	"k8s.io/helm/pkg/urlutil"
 )
 
 // Entry represents a collection of parameters for chart repository
 type Entry struct {
-	Name     string `json:"name"`
+	// Name is chart repository name.
+	Name string `json:"name"`
+
+	// Root represents chart repository root. For backwards compatibility, if
+	// root is empty, assume Name as repository root.
+	Root string `json:"root"`
+
 	Cache    string `json:"cache"`
 	URL      string `json:"url"`
 	Username string `json:"username"`
@@ -45,10 +52,13 @@ type Entry struct {
 
 // ChartRepository represents a chart repository
 type ChartRepository struct {
-	Config     *Entry
+	Config *Entry
+
+	// ChartPaths contains chart file paths relative to repository root.
 	ChartPaths []string
-	IndexFile  *IndexFile
-	Client     getter.Getter
+
+	IndexFile *IndexFile
+	Client    getter.Getter
 }
 
 // NewChartRepository constructs ChartRepository
@@ -78,7 +88,7 @@ func NewChartRepository(cfg *Entry, getters getter.Providers) (*ChartRepository,
 //
 // It requires the presence of an index.yaml file in the directory.
 func (r *ChartRepository) Load() error {
-	dirInfo, err := os.Stat(r.Config.Name)
+	dirInfo, err := os.Stat(r.Root())
 	if err != nil {
 		return err
 	}
@@ -89,17 +99,26 @@ func (r *ChartRepository) Load() error {
 	// FIXME: Why are we recursively walking directories?
 	// FIXME: Why are we not reading the repositories.yaml to figure out
 	// what repos to use?
-	filepath.Walk(r.Config.Name, func(path string, f os.FileInfo, err error) error {
-		if !f.IsDir() {
-			if strings.Contains(f.Name(), "-index.yaml") {
-				i, err := LoadIndexFile(path)
-				if err != nil {
-					return nil
-				}
-				r.IndexFile = i
-			} else if strings.HasSuffix(f.Name(), ".tgz") {
-				r.ChartPaths = append(r.ChartPaths, path)
+	filepath.Walk(r.Root(), func(path string, f os.FileInfo, err error) error {
+		if f.IsDir() {
+			return nil
+		}
+
+		if strings.Contains(f.Name(), "-index.yaml") {
+			i, err := LoadIndexFile(path)
+			if err != nil {
+				return nil
 			}
+			r.IndexFile = i
+			return nil
+		}
+
+		if strings.HasSuffix(f.Name(), ".tgz") {
+			fpath, err := filepath.Rel(r.Root(), path)
+			if err != nil {
+				return err
+			}
+			r.ChartPaths = append(r.ChartPaths, fpath)
 		}
 		return nil
 	})
@@ -166,28 +185,44 @@ func (r *ChartRepository) saveIndexFile() error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filepath.Join(r.Config.Name, indexPath), index, 0644)
+	return ioutil.WriteFile(filepath.Join(r.Root(), indexPath), index, 0644)
 }
 
 func (r *ChartRepository) generateIndex() error {
-	for _, path := range r.ChartPaths {
-		ch, err := chartutil.Load(path)
+	dir := r.Root()
+	for _, cp := range r.ChartPaths {
+		fpath := filepath.Join(dir, cp)
+		ch, err := chartutil.Load(fpath)
 		if err != nil {
 			return err
 		}
 
-		digest, err := provenance.DigestFile(path)
+		digest, err := provenance.DigestFile(fpath)
 		if err != nil {
 			return err
+		}
+
+		u, err := urlutil.URLJoin(r.Config.URL, cp)
+		if err != nil {
+			u = filepath.Join(r.Config.URL, cp)
 		}
 
 		if !r.IndexFile.Has(ch.Metadata.Name, ch.Metadata.Version) {
-			r.IndexFile.Add(ch.Metadata, path, r.Config.URL, digest)
+			r.IndexFile.AddChartVersion(ch.Metadata, u, digest)
 		}
 		// TODO: If a chart exists, but has a different Digest, should we error?
 	}
 	r.IndexFile.SortEntries()
 	return nil
+}
+
+// Root returns repository root directory.
+func (r *ChartRepository) Root() string {
+	if r.Config.Root != "" {
+		return r.Config.Root
+	}
+
+	return r.Config.Name
 }
 
 // FindChartInRepoURL finds chart in chart repository pointed by repoURL
