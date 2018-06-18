@@ -100,18 +100,21 @@ func (r *RepoFile) Add(re ...*Entry) {
 // entry with the same name doesn't exist in the repo file it will add it.
 func (r *RepoFile) Update(re ...*Entry) {
 	for _, target := range re {
-		found := false
-		for j, repo := range r.Repositories {
-			if repo.Name == target.Name {
-				r.Repositories[j] = target
-				found = true
-				break
-			}
-		}
-		if !found {
-			r.Add(target)
+		r.updateEntry(target)
+	}
+}
+
+// Update attempts to replace repo entry in a repo file. If an
+// entry with the same name doesn't exist in the repo file it will add it.
+func (r *RepoFile) updateEntry(re *Entry) {
+	for j, repo := range r.Repositories {
+		if repo.Name == re.Name {
+			r.Repositories[j] = re
+			return
 		}
 	}
+
+	r.Add(re)
 }
 
 // Has returns true if the given name is already a repository name.
@@ -132,17 +135,13 @@ func (r *RepoFile) Get(name string) (*Entry, bool) {
 
 // Remove removes the entry from the list of repositories.
 func (r *RepoFile) Remove(name string) bool {
-	cp := []*Entry{}
-	found := false
-	for _, rf := range r.Repositories {
+	for i, rf := range r.Repositories {
 		if rf.Name == name {
-			found = true
-			continue
+			r.Repositories = append(r.Repositories[:i], r.Repositories[i+1:]...)
+			return true
 		}
-		cp = append(cp, rf)
 	}
-	r.Repositories = cp
-	return found
+	return false
 }
 
 // WriteFile writes a repositories file to the given path.

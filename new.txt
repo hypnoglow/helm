@@ -1,0 +1,9 @@
+WARNING: Deprecated index file format. Try 'helm repo update'
+goos: darwin
+goarch: amd64
+pkg: k8s.io/helm/pkg/repo
+BenchmarkRepoFile_Remove-8   	 2000000	       631 ns/op	     896 B/op	      10 allocs/op
+PASS
+ok  	k8s.io/helm/pkg/repo	1.958s
+PASS
+ok  	k8s.io/helm/pkg/repo/repotest	0.031s

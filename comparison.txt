@@ -1,0 +1,8 @@
+benchmark                      old ns/op     new ns/op     delta
+BenchmarkRepoFile_Remove-8     898           631           -29.73%
+
+benchmark                      old allocs     new allocs     delta
+BenchmarkRepoFile_Remove-8     14             10             -28.57%
+
+benchmark                      old bytes     new bytes     delta
+BenchmarkRepoFile_Remove-8     1016          896           -11.81%

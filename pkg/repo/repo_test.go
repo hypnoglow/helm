@@ -159,30 +159,54 @@ func TestRepoFile_Get(t *testing.T) {
 	}
 }
 
-func TestRemoveRepository(t *testing.T) {
-	sampleRepository := NewRepoFile()
-	sampleRepository.Add(
+func TestRepoFile_Remove(t *testing.T) {
+	repo := NewRepoFile()
+	repo.Add(
 		&Entry{
-			Name:  "stable",
-			URL:   "https://example.com/stable/charts",
-			Cache: "stable-index.yaml",
+			Name:  "first",
+			URL:   "https://example.com/first",
+			Cache: "first-index.yaml",
 		},
 		&Entry{
-			Name:  "incubator",
-			URL:   "https://example.com/incubator",
-			Cache: "incubator-index.yaml",
+			Name:  "second",
+			URL:   "https://example.com/second",
+			Cache: "second-index.yaml",
+		},
+		&Entry{
+			Name:  "third",
+			URL:   "https://example.com/third",
+			Cache: "third-index.yaml",
+		},
+		&Entry{
+			Name:  "fourth",
+			URL:   "https://example.com/fourth",
+			Cache: "fourth-index.yaml",
 		},
 	)
 
-	removeRepository := "stable"
-	found := sampleRepository.Remove(removeRepository)
-	if !found {
-		t.Errorf("expected repository %s not found", removeRepository)
+	name := "second"
+
+	removed := repo.Remove(name)
+	if !removed {
+		t.Fatalf("Expected repo entry %q to be removed", name)
 	}
 
-	found = sampleRepository.Has(removeRepository)
-	if found {
-		t.Errorf("repository %s not deleted", removeRepository)
+	// Check that order is preserved
+
+	if len(repo.Repositories) != 3 {
+		t.Fatalf("Expected number of entries to be %v but got %v", 3, len(repo.Repositories))
+	}
+
+	if repo.Repositories[0].Name != "first" {
+		t.Fatalf("Expected repo name to be %q but got %q", "first", repo.Repositories[0].Name)
+	}
+
+	if repo.Repositories[1].Name != "third" {
+		t.Fatalf("Expected repo name to be %q but got %q", "third", repo.Repositories[1].Name)
+	}
+
+	if repo.Repositories[2].Name != "fourth" {
+		t.Fatalf("Expected repo name to be %q but got %q", "fourth", repo.Repositories[2].Name)
 	}
 }
 
